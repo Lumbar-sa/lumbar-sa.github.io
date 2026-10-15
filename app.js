@@ -2,7 +2,7 @@ const CONFIG={
  endpoint:'https://script.google.com/macros/s/AKfycbxxBGHE4mZ5iDdplvvaFxVhrHoOMETyRoafgk8iG-DGx9vhY27JgFhc3VHFBO22hu4x0w/exec',
  snapPixelId:'233915bf-25f6-4119-9362-701fe3212185',
  sku:'LUMBAR-GEL-20G',
- receiverSku:'MULTI-COLLAGEN',
+ receiverSku:'LUMBAR-GEL-20G',
  product:'Lumbar Spine Cooling Gel (20g)',
  offers:{
   1:{label:'عبوة واحدة — 20g',price:173,quantity:1},
