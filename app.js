@@ -1,0 +1,71 @@
+const CONFIG={
+ endpoint:'https://script.google.com/macros/s/AKfycbxxBGHE4mZ5iDdplvvaFxVhrHoOMETyRoafgk8iG-DGx9vhY27JgFhc3VHFBO22hu4x0w/exec',
+ snapPixelId:'233915bf-25f6-4119-9362-701fe3212185',
+ sku:'LUMBAR-GEL-20G',
+ receiverSku:'MULTI-COLLAGEN',
+ product:'Lumbar Spine Cooling Gel (20g)',
+ offers:{
+  1:{label:'عبوة واحدة — 20g',price:173,quantity:1},
+  2:{label:'عبوتان — 40g',price:198,quantity:2},
+  3:{label:'3 عبوات — 60g',price:218,quantity:3}
+ }
+};
+(function initSnap(){
+ if(!CONFIG.snapPixelId)return;
+ (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function(){a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};a.queue=[];var s='script';var r=t.createElement(s);r.async=!0;r.src=n;var u=t.getElementsByTagName(s)[0];u.parentNode.insertBefore(r,u)})(window,document,'https://sc-static.net/scevent.min.js');
+ window.snaptr('init',CONFIG.snapPixelId);
+ window.snaptr('track','PAGE_VIEW',{item_ids:[CONFIG.sku],item_category:'PERSONAL_CARE'});
+ window.snaptr('track','VIEW_CONTENT',{item_ids:[CONFIG.sku],item_category:'PERSONAL_CARE'});
+})();
+const form=document.getElementById('order-form');
+const total=document.getElementById('summary-total');
+const offerSummary=document.getElementById('summary-offer');
+const status=document.getElementById('form-message');
+let checkoutTracked=false;
+function currentOffer(){const code=Number(new FormData(form).get('offer')||1);return {code,...CONFIG.offers[code]};}
+function updateSummary(){const o=currentOffer();offerSummary.textContent=o.label;total.textContent=o.price+' ريال';}
+function trackCheckout(){if(checkoutTracked||!window.snaptr)return;const o=currentOffer();checkoutTracked=true;window.snaptr('track','START_CHECKOUT',{price:o.price,currency:'SAR',item_ids:[CONFIG.sku],item_category:'PERSONAL_CARE',number_items:o.quantity});}
+form.addEventListener('change',()=>{updateSummary();trackCheckout();});
+form.addEventListener('focusin',trackCheckout,{once:true});
+const phoneInput=form.elements.phone;
+const phoneError=document.getElementById('phone-error');
+phoneInput.addEventListener('input',()=>{phoneInput.removeAttribute('aria-invalid');phoneError.textContent='';});
+function normalizeSaudiPhone(v){
+ let s=String(v||'').trim().replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[\s()\-\u200e\u200f\u061c]/g,'');
+ if(s.startsWith('+966'))s='0'+s.slice(4);else if(s.startsWith('00966'))s='0'+s.slice(5);else if(s.startsWith('966'))s='0'+s.slice(3);else if(/^5\d{8}$/.test(s))s='0'+s;
+ return /^05\d{8}$/.test(s)?s:null;
+}
+function getUtm(o){
+ const q=Object.fromEntries(new URLSearchParams(window.location.search));
+ return {utm_source:q.utm_source||'snapchat',utm_medium:q.utm_medium||'landing-page',utm_campaign:q.utm_campaign||'lumbar-cooling-gel',utm_term:q.utm_term||('bundle-'+o.code),utm_content:q.utm_content||'lumbar-sa.github.io'};
+}
+function showSuccess(o){
+ let modal=document.getElementById('success-modal');
+ if(!modal){modal=document.createElement('div');modal.id='success-modal';modal.className='success-modal';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.innerHTML='<div class="success-card"><div class="check">✓</div><h2>تم إرسال طلبك</h2><p>سنتواصل معك على رقم الجوال لتأكيد البيانات قبل الشحن.</p><strong id="success-offer"></strong><strong id="success-price"></strong><button type="button">حسنًا</button></div>';document.body.appendChild(modal);modal.querySelector('button').addEventListener('click',()=>modal.classList.remove('visible'));}
+ modal.querySelector('#success-offer').textContent=o.label;modal.querySelector('#success-price').textContent=o.price+' ريال';modal.classList.add('visible');
+}
+form.addEventListener('submit',async e=>{
+ e.preventDefault();status.textContent='';
+ const fd=new FormData(form),name=String(fd.get('name')||'').trim(),phone=normalizeSaudiPhone(fd.get('phone')),address=String(fd.get('address')||'').trim(),o=currentOffer();
+ if(name.length<2){status.textContent='يرجى كتابة الاسم الكامل.';return;}
+ if(!phone){phoneError.textContent='رقم الهاتف غير صحيح';phoneInput.setAttribute('aria-invalid','true');phoneInput.focus();return;}
+ phoneError.textContent='';phoneInput.removeAttribute('aria-invalid');
+ if(address.length<2){status.textContent='يرجى كتابة المدينة.';return;}
+ const btn=form.querySelector('.submit');btn.disabled=true;btn.textContent='جارٍ إرسال طلبك…';
+ const tx='LUMBAR-'+Date.now()+'-'+Math.random().toString(36).slice(2,8).toUpperCase();
+ const payload={
+  transactionId:tx,product:CONFIG.product,name,phone,address,
+  offerCode:o.code,offer:o.label,price:o.price,unitPrice:o.price,totalPrice:o.price,orderTotal:o.price,amount:o.price,sellingPrice:o.price,offerPrice:o.price,
+  country:'SA',sku:CONFIG.receiverSku,receiverSku:CONFIG.receiverSku,productSku:CONFIG.sku,currency:'SAR',
+  quantity:o.quantity,pageUrl:window.location.href,source:'Lumbar Cooling Gel Landing Page',utm:getUtm(o)
+ };
+ try{
+  const body=JSON.stringify(payload);let queued=false;
+  if(navigator.sendBeacon){try{queued=navigator.sendBeacon(CONFIG.endpoint,new Blob([body],{type:'text/plain;charset=utf-8'}));}catch(_){}}
+  if(!queued){if(navigator.onLine===false)throw new Error('offline');fetch(CONFIG.endpoint,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body}).catch(()=>{});}
+  if(window.snaptr)window.snaptr('track','PURCHASE',{price:o.price,currency:'SAR',transaction_id:tx,item_ids:[CONFIG.sku],item_category:'PERSONAL_CARE',number_items:o.quantity});
+  btn.textContent='تم إرسال الطلب ✓';status.textContent='تم إرسال طلبك. سنتواصل معك للتأكيد قبل الشحن.';showSuccess(o);
+ }catch(err){btn.disabled=false;btn.textContent='تأكيد الطلب — الدفع عند الاستلام';status.textContent='تعذر إرسال الطلب الآن. تحقق من اتصال الإنترنت وحاول مرة أخرى.';}
+});
+document.addEventListener('click',e=>{const a=e.target.closest('a[href="#order"]');if(!a)return;e.preventDefault();const target=document.getElementById('order');if(target){target.scrollIntoView({behavior:'auto',block:'start'});requestAnimationFrame(()=>target.scrollIntoView({behavior:'auto',block:'start'}));}});
+updateSummary();
